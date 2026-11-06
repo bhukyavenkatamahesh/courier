@@ -2,6 +2,10 @@
 
 **Reliable, congestion-controlled file transfer over UDP — and a Mininet testbed to prove two of them share a link fairly.**
 
+### ▶ [Watch the protocol run](https://bhukyavenkatamahesh.github.io/courier/)
+
+An interactive walkthrough: packets and acknowledgements in flight, the window growing and collapsing, loss and recovery as they happen.
+
 A courier guarantees delivery over roads that give no such guarantee. That is exactly the problem here: UDP offers no ordering, no delivery guarantee, and no sense of how fast the network can actually go. Everything that turns it into a transport you can trust with a file — sequence numbers, acknowledgements, retransmission, a window that adapts to the link — is implemented by hand in this repository.
 
 ---
@@ -47,6 +51,8 @@ Client 2 ─┘                                    └─ Server 2
 The far client's feedback is slower, so it grows its window more slowly and is naturally disadvantaged. Fairness under asymmetric delay is the real test.
 
 ## Visual walkthrough
+
+**Live at [bhukyavenkatamahesh.github.io/courier](https://bhukyavenkatamahesh.github.io/courier/)**
 
 `index.html` is a self-contained interactive explanation — packets and acknowledgements in flight, the window growing and collapsing, the timeout timer running down. It narrates what the protocol is doing and why, with a plain-English / technical toggle, and buttons to force a packet loss, a lost acknowledgement, a fast retransmit, or a timeout. Open it in any browser; no server or build step.
 

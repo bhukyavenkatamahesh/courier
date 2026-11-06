@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: courier
+    runtime: static
+    # Nothing to build: index.html is self-contained, no dependencies
+    buildCommand: ""
+    staticPublishPath: .
+    pullRequestPreviewsEnabled: false
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff

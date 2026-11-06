@@ -1,0 +1,11 @@
+# editors / OS
+.idea/
+.DS_Store
+
+# run artifacts
+*.log
+*received_file.txt
+p2_fairness.csv
+some_file_of_500kb.txt
+nohup.out
+__pycache__/

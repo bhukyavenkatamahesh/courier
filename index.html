@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Packet Game</title>
+<style>
+  :root{
+    --bg:#fafaf8;--fg:#1c1c1a;--mute:#86867f;--line:#e2e2dc;--line2:#d2d2ca;
+    --pkt:#2f6fed;--ack:#2e9e5b;--bad:#d9453b;--warn:#dd8c20;--card:#fff;--soft:#f2f2ee;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#151514;--fg:#ededE8;--mute:#8e8e86;--line:#2e2e2b;--line2:#3a3a36;--card:#1d1d1b;--soft:#232320;
+  }}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:900px;margin:0 auto;padding:36px 16px 60px}
+  h1{font-size:24px;font-weight:600;margin:0 0 6px;letter-spacing:-.01em}
+  h2{font-size:13px;font-weight:600;margin:0 0 14px;letter-spacing:.07em;text-transform:uppercase;color:var(--mute)}
+  p{margin:0 0 12px}
+  .lede{color:var(--mute);font-size:16px;margin-bottom:28px;max-width:62ch}
+  section{margin-bottom:40px}
+  hr{border:0;border-top:1px solid var(--line);margin:0 0 32px}
+
+  /* problem framing */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:620px){.cols{grid-template-columns:1fr}}
+  .box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .box h3{font-size:14px;font-weight:600;margin:0 0 6px}
+  .box p{font-size:14px;color:var(--mute);margin:0}
+  .box.red h3{color:var(--bad)} .box.green h3{color:var(--ack)}
+
+  /* narrator */
+  .narr{background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:16px 18px;margin-bottom:10px;min-height:92px}
+  .narr .big{font-size:17px;font-weight:500;letter-spacing:-.01em}
+  .narr .why{color:var(--mute);font-size:14px;margin-top:6px}
+  .narr .why b{font-weight:600;color:var(--fg)}
+
+  /* stats */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px;margin:10px 0}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
+  .stat b{display:block;font-size:19px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .stat span{color:var(--mute);font-size:11.5px}
+
+  canvas{width:100%;display:block;background:var(--card);border:1px solid var(--line);border-radius:10px;cursor:crosshair}
+  .legend{display:flex;flex-wrap:wrap;gap:16px;color:var(--mute);font-size:12.5px;margin:10px 2px}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+
+  .controls{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin:14px 0 10px}
+  button{font:inherit;font-size:13.5px;background:var(--fg);color:var(--bg);border:0;border-radius:7px;padding:7px 14px;cursor:pointer}
+  button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line2)}
+  button.ghost:hover{background:var(--soft)}
+  button:disabled{opacity:.4;cursor:default}
+  label{display:flex;align-items:center;gap:8px;color:var(--mute);font-size:13.5px}
+  input[type=range]{width:100px;accent-color:var(--fg)}
+  .seg{display:inline-flex;border:1px solid var(--line2);border-radius:7px;overflow:hidden}
+  .seg button{background:transparent;color:var(--mute);border-radius:0;padding:6px 12px}
+  .seg button[aria-pressed=true]{background:var(--fg);color:var(--bg)}
+
+  .try{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 2px}
+  .hint{color:var(--mute);font-size:13px;margin:10px 0 0}
+
+  #log{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;
+    height:140px;overflow:auto;font:12.5px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:14px}
+  #log div.bad{color:var(--bad)} #log div.good{color:var(--ack)} #log div.warn{color:var(--warn)}
+  #log .t{color:var(--mute)}
+
+  /* mechanism list */
+  .mech{border-top:1px solid var(--line)}
+  .mech details{border-bottom:1px solid var(--line)}
+  .mech summary{cursor:pointer;padding:13px 2px;font-weight:500;list-style:none;display:flex;justify-content:space-between;gap:12px;align-items:center}
+  .mech summary::-webkit-details-marker{display:none}
+  .mech summary::after{content:"+";color:var(--mute);font-size:16px}
+  .mech details[open] summary::after{content:"–"}
+  .mech .body{padding:0 2px 16px;color:var(--mute);font-size:14px;max-width:68ch}
+  .mech .body code{background:var(--soft);padding:1px 5px;border-radius:4px;font-size:12.5px;color:var(--fg)}
+  .mech .body p{margin:0 0 9px}
+
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  td{padding:9px 0;border-bottom:1px solid var(--line);vertical-align:top}
+  td:first-child{color:var(--mute);width:42%;padding-right:16px}
+  .files{font:12.5px/1.9 ui-monospace,Menlo,monospace;color:var(--mute)}
+  .files b{color:var(--fg);font-weight:500}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Packet Game</h1>
+  <p class="lede">A visual walkthrough of my networks project: building <b>reliable, congestion-controlled file
+  transfer on top of UDP</b> — a protocol that offers neither — and then measuring whether two of my
+  transfers share a bottleneck link fairly.</p>
+
+  <section>
+    <h2>The problem</h2>
+    <div class="cols">
+      <div class="box red">
+        <h3>What UDP gives you</h3>
+        <p>Fire a packet and hope. No ordering, no delivery guarantee, no notion of how fast the network can
+        actually go. Packets vanish, arrive out of order, or arrive twice.</p>
+      </div>
+      <div class="box green">
+        <h3>What a file transfer needs</h3>
+        <p>Every byte, exactly once, in the right order — and a sending rate that adapts to the network instead
+        of flooding it and starving everyone else on the link.</p>
+      </div>
+    </div>
+    <p style="margin-top:12px;color:var(--mute);font-size:14px;max-width:68ch">Everything in the gap between
+    those two boxes is what I had to implement by hand. The simulation below is that implementation, running.</p>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>Watch it run</h2>
+
+    <div class="narr">
+      <div class="big" id="nTitle">Starting up…</div>
+      <div class="why" id="nWhy"></div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b id="sCwnd">1</b><span id="lCwnd">packets in flight</span></div>
+      <div class="stat"><b id="sThresh">16</b><span id="lThresh">caution point</span></div>
+      <div class="stat"><b id="sPhase">Ramping up</b><span>strategy</span></div>
+      <div class="stat"><b id="sTimeout">3.0</b><span id="lTimeout">patience (s)</span></div>
+      <div class="stat"><b id="sDone">0 / 48</b><span>delivered</span></div>
+      <div class="stat"><b id="sRetx">0</b><span>resent</span></div>
+    </div>
+
+    <canvas id="c" height="340"></canvas>
+
+    <div class="legend">
+      <span><i class="dot" style="background:var(--pkt)"></i>data packet</span>
+      <span><i class="dot" style="background:var(--ack);border-radius:50%"></i>acknowledgement</span>
+      <span><i class="dot" style="background:var(--warn)"></i>resent packet</span>
+      <span><i class="dot" style="background:var(--bad)"></i>lost</span>
+    </div>
+
+    <div class="controls">
+      <button id="play">Pause</button>
+      <button id="reset" class="ghost">Restart</button>
+      <div class="seg" role="group" aria-label="Wording">
+        <button id="mPlain" aria-pressed="true">Plain English</button>
+        <button id="mTech" aria-pressed="false">Technical</button>
+      </div>
+      <label>Loss <input id="loss" type="range" min="0" max="40" value="6"><span id="lossV">6%</span></label>
+      <label>Speed <input id="speed" type="range" min="0.5" max="4" step="0.5" value="1.5"><span id="speedV">1.5x</span></label>
+    </div>
+
+    <div class="try">
+      <button class="ghost" data-sc="drop">Lose a packet</button>
+      <button class="ghost" data-sc="ack">Lose an acknowledgement</button>
+      <button class="ghost" data-sc="fast">Trigger fast retransmit</button>
+      <button class="ghost" data-sc="timeout">Force a timeout</button>
+    </div>
+    <p class="hint">Or click any packet in flight to destroy it yourself, and watch the sender notice and recover.</p>
+
+    <div id="log"></div>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>What's actually going on</h2>
+    <div class="mech">
+      <details open>
+        <summary>Numbering every packet</summary>
+        <div class="body">
+          <p>Each packet carries the byte offset it starts at, so the receiver can put a jumbled stream back in
+          order and spot a gap. In the code a packet is literally <code>seq_num | data</code>, with 1400 bytes
+          of payload.</p>
+          <p><b>Why 1400?</b> Ethernet's MTU is 1500 bytes. Staying under it means the network never has to
+          fragment my packets — fragmentation would mean losing one fragment loses the whole packet.</p>
+        </div>
+      </details>
+      <details>
+        <summary>Cumulative acknowledgements</summary>
+        <div class="body">
+          <p>The receiver doesn't ack each packet individually. It acks the next byte it still needs — "I have
+          everything before this." One ack can therefore confirm many packets, and a lost ack is harmless
+          because the next one supersedes it.</p>
+          <p>If a packet arrives early, the receiver <b>buffers it</b> and keeps asking for the missing one.
+          Nothing is thrown away, and nothing is written to disk out of order.</p>
+        </div>
+      </details>
+      <details>
+        <summary>The sliding window — how fast to send</summary>
+        <div class="body">
+          <p>The window is how many packets the sender is willing to have unacknowledged at once. Send one at a
+          time and a 50 ms link wastes almost all its capacity waiting. Send everything at once and you drown
+          the bottleneck.</p>
+          <p>So: start at 1, and <b>double the window every successful round</b> (slow start) until hitting a
+          threshold, then grow by just one per round (congestion avoidance). Fast probing while it's safe,
+          cautious probing once we're near the limit.</p>
+        </div>
+      </details>
+      <details>
+        <summary>Detecting loss two different ways</summary>
+        <div class="body">
+          <p><b>Duplicate acks.</b> If packet 5 is lost but 6, 7, 8 arrive, the receiver keeps repeating "I
+          still need 5." Three of those and the sender resends immediately rather than waiting for a timer —
+          this is <b>fast retransmit</b>. Data is still flowing, so the network isn't badly congested; the
+          window is halved, not reset.</p>
+          <p><b>Timeout.</b> Total silence means something worse. The sender resends and drops the window all
+          the way back to 1.</p>
+          <p><b>Worth knowing:</b> duplicate acks only exist if the receiver re-acks on every out-of-order
+          arrival. My receiver buffers silently instead, so in the real code recovery almost always comes from
+          the timer — the sender's fast-retransmit path is there but rarely reached. The simulation re-acks, so
+          you can actually see it fire.</p>
+        </div>
+      </details>
+      <details>
+        <summary>How long to wait before panicking</summary>
+        <div class="body">
+          <p>A fixed timeout is wrong everywhere: too short on a slow link and you flood it with needless
+          resends, too long on a fast one and you stall. So the sender measures each round trip and keeps a
+          running average plus a running measure of how much it varies:</p>
+          <p><code>timeout = estimatedRTT + 4 × deviation</code></p>
+          <p>The deviation term is what makes it adaptive — on a jittery link the sender automatically becomes
+          more patient. Watch the <b>patience</b> number change as the simulation runs.</p>
+        </div>
+      </details>
+      <details>
+        <summary>Why backing off is the whole point</summary>
+        <div class="body">
+          <p>Halving the rate on loss looks like it hurts the sender, and in isolation it does. But every
+          sender on the link doing the same thing is what stops a shared bottleneck from collapsing — and it's
+          what makes two transfers converge to roughly equal shares instead of one hogging the link.</p>
+          <p>That convergence is exactly what the second half of the project measures.</p>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>The experiment</h2>
+    <p style="color:var(--mute);font-size:14px;max-width:68ch">The simulation above shows one transfer. The real
+    question was what happens when <b>two independent transfers share one bottleneck</b> — and whether the
+    congestion control I wrote divides that link fairly even when one client sits much further away.</p>
+
+    <div id="topo"></div>
+
+    <table style="margin-top:18px">
+      <tr><td>Test bed</td><td>Mininet dumbbell topology, two client–server pairs, 100 Mbps bottleneck between the switches</td></tr>
+      <tr><td>Variable</td><td>Extra delay on the second server's link, 0 → 100 ms in 20 ms steps, 5 runs each</td></tr>
+      <tr><td>Correctness check</td><td>MD5 of each received file compared against the original — the transfer is either byte-perfect or it failed</td></tr>
+      <tr><td>Fairness measure</td><td>Jain's index over the two throughputs: 1.0 is a perfectly equal split, 0.5 means one flow took everything</td></tr>
+      <tr><td>Why it's hard</td><td>The far client's feedback is slower, so it grows its window more slowly and is naturally at a disadvantage — fairness under asymmetric delay is the real test</td></tr>
+    </table>
+  </section>
+
+  <hr>
+
+  <section>
+    <h2>The code</h2>
+    <p class="files">
+      <b>p2_server.py</b> — sender: windowing, retransmission, slow start, fast retransmit, adaptive timeout<br>
+      <b>p2_client.py</b> — receiver: in-order writing, buffering of early packets, cumulative acks<br>
+      <b>p2_exp.py</b> — Mininet harness: builds the topology, runs both transfers, records MD5 and fairness<br>
+      <b>index.html</b> — this page
+    </p>
+  </section>
+
+</div>
+
+<script>
+/* ---------------------------------------------------------------
+   Simulation mirrors p2_server.py / p2_client.py.
+   Packets are counted by index rather than byte offset for clarity.
+----------------------------------------------------------------*/
+const TOTAL = 48, THRESH0 = 16, A = .25, B = .25, DUP_THRESH = 3;
+const ONE_WAY = .7, MIN_TIMEOUT = 2.0;
+
+const $ = id => document.getElementById(id);
+const cv = $('c'), ctx = cv.getContext('2d');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let W, H = 340, plain = true, playing = true, last = null;
+let S, now, flying, hist, entries;
+
+function resize(){
+  const d = devicePixelRatio || 1; W = cv.clientWidth;
+  cv.width = W*d; cv.height = H*d; ctx.setTransform(d,0,0,d,0,0);
+}
+addEventListener('resize', resize); resize();
+
+/* ---------- logging, dual-worded ---------- */
+function log(tech, plainText, cls){
+  entries.push({t:now, tech, plain:plainText||tech, cls:cls||''});
+  if(entries.length > 160) entries.shift();
+  renderLog();
+}
+function renderLog(){
+  const l = $('log');
+  l.innerHTML = entries.map(e =>
+    `<div class="${e.cls}"><span class="t">${e.t.toFixed(1)}s</span>  ${plain ? e.plain : e.tech}</div>`
+  ).join('');
+  l.scrollTop = l.scrollHeight;
+}
+/* narrator note that lingers a moment over the steady-state text */
+function note(tech, plainText, why){ S.note = {tech, plain:plainText, why, t:now}; }
+
+function init(){
+  now = 0; flying = []; hist = [1]; entries = [];
+  S = { cwnd:1, thresh:THRESH0, next:0, unacked:new Map(), lastAck:-1, dup:1,
+        allowSend:true, estRtt:1, dev:0, timeout:3, timer:0,
+        expected:0, buffer:new Set(), delivered:0, retx:0, done:false,
+        note:null, forceData:0, forceAck:0 };
+  log('Client sent START; server begins transfer',
+      'The receiver asks for the file. The sender starts with a single packet.');
+}
+
+const lossy = () => Math.random() < $('loss').value/100;
+
+function sendData(idx, isRetx){
+  let lost = lossy();
+  if(S.forceData > 0){ lost = true; S.forceData--; }
+  flying.push({kind:'data', idx, t0:now, dur:ONE_WAY, lost, retx:isRetx});
+  if(isRetx) S.retx++;
+}
+function sendAck(n){
+  let lost = lossy();
+  if(S.forceAck > 0){ lost = true; S.forceAck--; }
+  flying.push({kind:'ack', idx:n, t0:now, dur:ONE_WAY, lost});
+}
+
+/* ---------- sender ---------- */
+function serverSend(){
+  if(!S.allowSend || S.next >= TOTAL) return;
+  let sent = 0;
+  while(S.unacked.size < S.cwnd && S.next < TOTAL){
+    sendData(S.next, false); S.unacked.set(S.next, now); S.next++; sent++;
+  }
+  if(sent){
+    S.allowSend = false; S.timer = now;
+    log(`Sent window of ${sent} packet(s), ${S.unacked.size} unacked`,
+        sent === 1 ? 'Sent 1 packet, now waiting.' : `Sent ${sent} packets at once, now waiting.`);
+  }
+}
+
+function serverOnAck(n){
+  if(n > S.lastAck && S.unacked.size){
+    const sendT = S.unacked.get(n-1);
+    S.lastAck = n; S.dup = 1; S.timer = now;
+    for(const k of [...S.unacked.keys()]) if(k < n) S.unacked.delete(k);
+    log(`Cumulative ACK ${n} received`,
+        `Receiver confirms everything up to packet ${n-1} arrived.`, 'good');
+
+    if(S.unacked.size === 0){
+      if(sendT !== undefined){
+        const sample = now - sendT;
+        S.estRtt = (1-A)*S.estRtt + A*sample;
+        S.dev = (1-B)*S.dev + B*Math.abs(sample - S.estRtt);
+        S.timeout = Math.max(MIN_TIMEOUT, S.estRtt + 4*S.dev);
+      }
+      S.allowSend = true;
+      const before = S.cwnd;
+      if(S.cwnd < S.thresh){
+        S.cwnd = Math.min(S.cwnd*2, S.thresh*2);
+        log(`Slow start: cwnd ${before} → ${S.cwnd}`,
+            `Whole batch made it, so the sender doubles up: ${before} → ${S.cwnd} packets at a time.`);
+        note(`Slow start, cwnd = ${S.cwnd}`,
+             `Everything arrived — so send ${S.cwnd} at once next time.`,
+             'Doubling each round finds the network\'s speed limit quickly, instead of creeping up one packet at a time.');
+      } else {
+        S.cwnd += 1;
+        log(`Congestion avoidance: cwnd ${before} → ${S.cwnd}`,
+            `Near the safe limit now, so the sender adds just one more packet: ${before} → ${S.cwnd}.`);
+        note(`Congestion avoidance, cwnd = ${S.cwnd}`,
+             `Close to the limit — adding just one more packet per round.`,
+             'Past the threshold, doubling would likely overshoot and cause loss, so growth slows to +1.');
+      }
+      hist.push(S.cwnd);
+    }
+  } else {
+    S.dup++;
+    log(`Duplicate ACK ${n} (count ${S.dup})`,
+        `Receiver repeats: "still waiting for packet ${n}." (${S.dup} times)`, 'warn');
+    if(S.dup >= DUP_THRESH && S.unacked.size){
+      const oldest = Math.min(...S.unacked.keys());
+      sendData(oldest, true);
+      S.dup = 0;
+      const before = S.cwnd;
+      S.cwnd = Math.max(1, Math.floor(S.cwnd/2));
+      S.thresh = Math.max(S.thresh/2, 2);
+      hist.push(S.cwnd);
+      log(`3 dup ACKs → fast retransmit ${oldest}; cwnd ${before} → ${S.cwnd}, ssthresh ${S.thresh}`,
+          `Three repeats is proof packet ${oldest} is gone. Resending it now and slowing down by half.`, 'bad');
+      note(`Fast retransmit of packet ${oldest}`,
+           `Packet ${oldest} is clearly lost — resending it without waiting.`,
+           'Later packets are still arriving, so the path works. The sender halves its rate rather than resetting to 1.');
+    }
+  }
+}
+
+function serverTimeout(){
+  if(!S.unacked.size || S.allowSend) return;
+  if(now - S.timer > S.timeout){
+    const keys = [...S.unacked.keys()].sort((a,b)=>a-b);
+    if(S.lastAck > -1) sendData(keys[0], true); else keys.forEach(k => sendData(k, true));
+    const before = S.cwnd;
+    S.cwnd = 1; S.thresh = Math.max(S.thresh/2, 2); hist.push(1); S.timer = now;
+    log(`Timeout after ${S.timeout.toFixed(1)}s → retransmit; cwnd ${before} → 1, ssthresh ${S.thresh}`,
+        `Nothing came back at all. Resending, and dropping right back to one packet at a time.`, 'bad');
+    note('Timeout — back to square one',
+         'Silence. The sender assumes the worst and restarts slowly.',
+         'No acks at all may mean the path is badly congested, so the safe response is to drop the rate to the minimum.');
+  }
+}
+
+/* ---------- receiver ---------- */
+function clientOnData(idx){
+  if(idx === S.expected){
+    S.expected++;
+    let flushed = 0;
+    while(S.buffer.has(S.expected)){ S.buffer.delete(S.expected); S.expected++; flushed++; }
+    S.delivered = S.expected;
+    if(flushed) log(`Gap filled; flushed ${flushed} buffered packet(s)`,
+      `The missing piece arrived — ${flushed} packet(s) held in memory could finally be written too.`, 'good');
+    sendAck(S.expected);
+  } else if(idx < S.expected){
+    sendAck(S.expected);
+  } else {
+    S.buffer.add(idx);
+    log(`Out-of-order packet ${idx} buffered; re-ACKing ${S.expected}`,
+        `Packet ${idx} arrived early. Held in memory, and the receiver repeats that it still needs ${S.expected}.`, 'warn');
+    sendAck(S.expected);   // duplicate ACK — this is what triggers fast retransmit
+  }
+}
+
+function step(){
+  if(S.done) return;
+  serverSend();
+  for(const p of flying){
+    if(p.arrived) continue;
+    const t = (now - p.t0)/p.dur;
+    if(p.lost && t > .5 && !p.logged){
+      p.logged = true;
+      log(`${p.kind==='data'?'Packet':'ACK'} ${p.idx} lost in transit`,
+          p.kind==='data' ? `Packet ${p.idx} vanished on the way.`
+                          : `An acknowledgement vanished on the way back.`, 'bad');
+    }
+    if(t >= 1){
+      p.arrived = true;
+      if(!p.lost) p.kind === 'data' ? clientOnData(p.idx) : serverOnAck(p.idx);
+    }
+  }
+  flying = flying.filter(p => !p.arrived && (!p.lost || (now - p.t0)/p.dur < 1.1));
+  serverTimeout();
+  if(S.delivered >= TOTAL && S.unacked.size === 0 && !S.done){
+    S.done = true;
+    log('END signal sent; transfer complete',
+        'Every packet delivered in order. The file on the other side is byte-for-byte identical.', 'good');
+    note('Transfer complete', 'Every byte arrived, in order.',
+         'In the real project this is where MD5 hashes of the two files are compared to prove it.');
+  }
+}
+
+/* ---------- drawing ---------- */
+const SX = 68, TOP = 46, BOT = 250;
+const CX = () => W - 68;
+function pos(p){
+  const t = Math.min(1, (now - p.t0)/p.dur);
+  const tt = p.lost ? Math.min(t, .5) : t;
+  const a = p.kind==='data' ? SX+28 : CX()-28, b = p.kind==='data' ? CX()-28 : SX+28;
+  const lane = p.idx % 10;
+  const y = p.kind === 'data' ? TOP+16 + lane/9*(BOT-TOP-120)
+                              : BOT-56 + lane/9*46;
+  return {x:a + (b-a)*tt, y, t};
+}
+function draw(){
+  const fg=css('--fg'), mute=css('--mute'), line=css('--line2'), soft=css('--soft'),
+        pk=css('--pkt'), ak=css('--ack'), bad=css('--bad'), warn=css('--warn');
+  ctx.clearRect(0,0,W,H);
+  ctx.font='12px -apple-system,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+
+  // hosts
+  ctx.strokeStyle=line; ctx.lineWidth=1;
+  [[SX,'Sender'],[CX(),'Receiver']].forEach(([x,label])=>{
+    ctx.fillStyle=soft; ctx.strokeStyle=line;
+    roundRect(x-28,TOP-12,56,BOT-TOP+24,8); ctx.fill(); ctx.stroke();
+    ctx.fillStyle=mute; ctx.fillText(label,x,TOP-26);
+  });
+
+  // window slots inside sender
+  const n = Math.min(S.cwnd, 8), slotH = (BOT-TOP+16)/8;
+  for(let i=0;i<n;i++){
+    ctx.fillStyle = i < S.unacked.size ? pk : line;
+    ctx.globalAlpha = i < S.unacked.size ? .9 : .5;
+    ctx.fillRect(SX-18, TOP-8+i*slotH+2, 36, slotH-5);
+  }
+  ctx.globalAlpha=1;
+  if(S.cwnd>8){ ctx.fillStyle=mute; ctx.fillText('+'+(S.cwnd-8)+' more',SX,BOT+22); }
+
+  // receiver fill
+  const frac = S.delivered/TOTAL, h = (BOT-TOP+24)*frac;
+  ctx.fillStyle=ak; ctx.globalAlpha=.9;
+  ctx.fillRect(CX()-24, BOT+12-h, 48, h); ctx.globalAlpha=1;
+  ctx.fillStyle=mute; ctx.fillText(Math.round(frac*100)+'%', CX(), BOT+22);
+
+  // buffered markers
+  let b2=0; ctx.fillStyle=warn;
+  for(const _ of S.buffer){ if(b2++>=7) break; ctx.fillRect(CX()-22+ (b2-1)*7, TOP-8, 5, 5); }
+
+  // packets
+  for(const p of flying){
+    const q = pos(p), gone = p.lost && q.t > .5;
+    ctx.globalAlpha = gone ? Math.max(0, 1-(q.t-.5)/.6) : 1;
+    ctx.fillStyle = gone ? bad : (p.kind==='ack' ? ak : (p.retx ? warn : pk));
+    if(p.kind==='data'){ roundRect(q.x-12,q.y-9,24,18,4); ctx.fill(); }
+    else { ctx.beginPath(); ctx.arc(q.x,q.y,9.5,0,7); ctx.fill(); }
+    ctx.fillStyle='#fff'; ctx.font='11px -apple-system,sans-serif';
+    ctx.fillText(p.idx, q.x, q.y+.5); ctx.font='12px -apple-system,sans-serif';
+    if(gone){
+      ctx.strokeStyle=bad; ctx.lineWidth=2; ctx.beginPath();
+      ctx.moveTo(q.x-9,q.y-9); ctx.lineTo(q.x+9,q.y+9);
+      ctx.moveTo(q.x+9,q.y-9); ctx.lineTo(q.x-9,q.y+9); ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // timeout bar
+  const bx = SX+34, bw = W-2*SX-68;
+  ctx.fillStyle=mute; ctx.textAlign='left';
+  ctx.fillText(plain ? 'patience running out' : 'retransmission timer', bx, H-62);
+  ctx.fillStyle=line; ctx.fillRect(bx,H-48,bw,4);
+  if(S.unacked.size && !S.allowSend){
+    const f = Math.min(1,(now-S.timer)/S.timeout);
+    ctx.fillStyle = f>.75 ? bad : warn; ctx.fillRect(bx,H-48,bw*f,4);
+  }
+
+  // cwnd sparkline
+  const gy = H-38, gh = 26, hs = hist.slice(-70), mx = Math.max(8,...hs);
+  ctx.strokeStyle=fg; ctx.lineWidth=1.4; ctx.beginPath();
+  hs.forEach((v,i)=>{
+    const x = bx + bw*(i/Math.max(1,hs.length-1)), y = gy+gh-(v/mx)*gh;
+    i ? ctx.lineTo(x,y) : ctx.moveTo(x,y);
+  });
+  ctx.stroke();
+  ctx.fillStyle=mute; ctx.textAlign='right';
+  ctx.fillText(plain ? 'sending rate over time' : 'cwnd over time', bx+bw, gy+4);
+
+  if(S.done){
+    ctx.textAlign='center'; ctx.fillStyle=ak;
+    ctx.font='600 15px -apple-system,sans-serif';
+    ctx.fillText('File transferred intact', W/2, TOP+70);
+  }
+}
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+
+/* ---------- narrator + stats ---------- */
+function narrate(){
+  if(S.note && now - S.note.t < 3.2){
+    $('nTitle').textContent = plain ? S.note.plain : S.note.tech;
+    $('nWhy').innerHTML = '<b>Why:</b> ' + S.note.why;
+    return;
+  }
+  let title, why;
+  if(S.done){
+    title = plain ? 'Done — every byte arrived, in order.' : 'Transfer complete; END sent.';
+    why = 'The real project then compares MD5 hashes to prove the received file is identical to the original.';
+  } else if(S.unacked.size){
+    title = plain
+      ? `${S.unacked.size} packet${S.unacked.size>1?'s':''} in flight, waiting for confirmation.`
+      : `${S.unacked.size} unacked packet(s); window ${S.cwnd}, timeout ${S.timeout.toFixed(1)}s.`;
+    why = S.cwnd < S.thresh
+      ? 'The sender has no idea how fast this link is, so it keeps doubling the batch until something breaks.'
+      : 'Near the limit, so the window now grows by one per round — overshooting here causes real loss.';
+  } else {
+    title = plain ? 'Preparing the next batch…' : 'Window clear; sending next cwnd packets.';
+    why = 'Nothing is outstanding, so the sender can safely push a larger batch.';
+  }
+  $('nTitle').textContent = title;
+  $('nWhy').innerHTML = '<b>Why:</b> ' + why;
+}
+function stats(){
+  $('sCwnd').textContent = S.cwnd;
+  $('sThresh').textContent = S.thresh;
+  $('sPhase').textContent = S.done ? 'Finished' : (S.cwnd < S.thresh
+      ? (plain ? 'Ramping up' : 'Slow start')
+      : (plain ? 'Being careful' : 'Avoidance'));
+  $('sTimeout').textContent = S.timeout.toFixed(1);
+  $('sDone').textContent = `${S.delivered} / ${TOTAL}`;
+  $('sRetx').textContent = S.retx;
+  $('lCwnd').textContent = plain ? 'packets in flight' : 'cwnd';
+  $('lThresh').textContent = plain ? 'caution point' : 'ssthresh';
+  $('lTimeout').textContent = plain ? 'patience (s)' : 'RTO (s)';
+}
+
+function frame(ts){
+  if(last == null) last = ts;
+  const dt = Math.min(.05,(ts-last)/1000) * parseFloat($('speed').value); last = ts;
+  if(playing && !S.done) { now += dt; step(); }
+  draw(); narrate(); stats();
+  requestAnimationFrame(frame);
+}
+
+/* ---------- interactions ---------- */
+cv.addEventListener('click', e => {
+  const r = cv.getBoundingClientRect(), mx = e.clientX-r.left, my = e.clientY-r.top;
+  for(const p of flying){
+    if(p.arrived || p.lost) continue;
+    const q = pos(p);
+    if(Math.abs(q.x-mx) < 15 && Math.abs(q.y-my) < 15){
+      p.lost = true;
+      log(`You destroyed ${p.kind} ${p.idx}`,
+          `You destroyed ${p.kind==='data'?'packet':'acknowledgement'} ${p.idx}. Watch what the sender does.`, 'bad');
+      break;
+    }
+  }
+});
+$('play').onclick = () => { playing = !playing; $('play').textContent = playing ? 'Pause' : 'Play'; };
+$('reset').onclick = () => { init(); };
+$('loss').oninput = e => $('lossV').textContent = e.target.value+'%';
+$('speed').oninput = e => $('speedV').textContent = e.target.value+'x';
+$('mPlain').onclick = () => setMode(true);
+$('mTech').onclick  = () => setMode(false);
+function setMode(p){
+  plain = p;
+  $('mPlain').setAttribute('aria-pressed', p);
+  $('mTech').setAttribute('aria-pressed', !p);
+  renderLog();
+}
+document.querySelectorAll('[data-sc]').forEach(btn => btn.onclick = () => {
+  const k = btn.dataset.sc;
+  if(k === 'drop'){ S.forceData = 1; note('Next packet will be dropped','The next packet will vanish. Watch the receiver keep asking for it.','A single loss is the common case — this is what the whole acknowledgement scheme exists to survive.'); }
+  if(k === 'ack'){ S.forceAck = 1; note('Next ACK will be dropped','The next acknowledgement will vanish on the way back.','Cumulative acks make this harmless: the following ack confirms the same packets anyway.'); }
+  if(k === 'fast'){
+    if(S.cwnd < 4){ S.cwnd = 4; hist.push(4); }
+    S.forceData = 1;
+    note('Setting up a fast retransmit','Dropping one packet from a large batch — the ones behind it will trigger repeated complaints.','Three duplicate acks are enough evidence to resend immediately instead of waiting out the timer.');
+  }
+  if(k === 'timeout'){ S.forceData = 99; setTimeout(()=>{ S.forceData = 0; }, 900); note('Dropping the whole window','Every packet in this batch will vanish, so nothing comes back at all.','With no feedback whatsoever the sender must assume serious congestion and reset to one packet.'); }
+});
+
+/* ---------- topology diagram ---------- */
+$('topo').innerHTML = `
+<svg viewBox="0 0 640 200" width="100%" style="display:block;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 0" xmlns="http://www.w3.org/2000/svg">
+  <g fill="none" stroke="var(--line2)" stroke-width="1.5">
+    <path d="M110 60 L240 90 M110 140 L240 110"/>
+    <path d="M400 90 L530 60 M400 110 L530 140"/>
+  </g>
+  <path d="M250 100 L390 100" stroke="var(--pkt)" stroke-width="3" fill="none"/>
+  <g font-family="-apple-system,sans-serif" font-size="12" fill="var(--fg)" text-anchor="middle">
+    <g fill="var(--soft)" stroke="var(--line2)">
+      <rect x="40" y="44" width="70" height="32" rx="6"/>
+      <rect x="40" y="124" width="70" height="32" rx="6"/>
+      <rect x="530" y="44" width="70" height="32" rx="6"/>
+      <rect x="530" y="124" width="70" height="32" rx="6"/>
+      <circle cx="250" cy="100" r="22"/>
+      <circle cx="390" cy="100" r="22"/>
+    </g>
+    <text x="75" y="64">Client 1</text>
+    <text x="75" y="144">Client 2</text>
+    <text x="565" y="64">Server 1</text>
+    <text x="565" y="144">Server 2</text>
+    <text x="250" y="104">sw1</text>
+    <text x="390" y="104">sw2</text>
+    <text x="320" y="84" fill="var(--pkt)" font-size="11">bottleneck · 100 Mbps</text>
+    <text x="320" y="130" fill="var(--mute)" font-size="11">both transfers compete here</text>
+    <text x="500" y="168" fill="var(--warn)" font-size="11">+0–100 ms extra delay</text>
+  </g>
+  <path d="M520 160 L560 150" stroke="var(--warn)" stroke-width="1.5" fill="none"/>
+</svg>`;
+
+init(); requestAnimationFrame(frame);
+</script>
+</body>
+</html>

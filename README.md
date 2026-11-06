@@ -2,7 +2,7 @@
 
 **Reliable, congestion-controlled file transfer over UDP — and a Mininet testbed to prove two of them share a link fairly.**
 
-### ▶ [Watch the protocol run](https://bhukyavenkatamahesh.github.io/courier/)
+### ▶ [Watch the protocol run](https://courier-gbz8.onrender.com/)
 
 An interactive walkthrough: packets and acknowledgements in flight, the window growing and collapsing, loss and recovery as they happen.
 
@@ -52,7 +52,7 @@ The far client's feedback is slower, so it grows its window more slowly and is n
 
 ## Visual walkthrough
 
-**Live at [bhukyavenkatamahesh.github.io/courier](https://bhukyavenkatamahesh.github.io/courier/)**
+**Live at [courier-gbz8.onrender.com](https://courier-gbz8.onrender.com/)**
 
 `index.html` is a self-contained interactive explanation — packets and acknowledgements in flight, the window growing and collapsing, the timeout timer running down. It narrates what the protocol is doing and why, with a plain-English / technical toggle, and buttons to force a packet loss, a lost acknowledgement, a fast retransmit, or a timeout. Open it in any browser; no server or build step.
 
